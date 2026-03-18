@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined');
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #ffffff;
+  --color-secondary: #f4f4f5;
+  --color-background-dark: #0f0f11;
+  --color-surface-dark: #18181b;
+  --color-border-dark: #27272a;
+  --color-border-thin: #27272a;
+  --color-input-bg: #18181b;
+  --color-gaming-start: #ffffff;
+  --color-gaming-end: #cbd5e1;
+
+  --font-sans: 'Inter', sans-serif;
+
+  --shadow-glow: 0 0 25px -5px rgba(255, 255, 255, 0.15);
+
+  --background-image-gaming-gradient: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  --background-image-gaming-gradient-hover: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  color: #ffffff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-input-bg) inset;
+  -webkit-text-fill-color: #ffffff;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dark);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-thin);
+}
+
