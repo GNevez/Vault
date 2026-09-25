@@ -2,12 +2,15 @@ export interface ServerSummary {
   id: number; name: string; description: string | null; ownerId: number; isOwner: boolean; memberCount: number;
 }
 export interface VoiceChannel { id: number; name: string; userLimit: number; position: number }
-/** Not served by the API yet; the UI renders them as soon as `textChannels` is present. */
 export interface TextChannel { id: number; name: string; topic?: string | null; position: number }
+export interface ChatMessage {
+  id: number; channelId: number; authorId: number; authorUsername: string; authorName: string; authorAvatarUrl: string | null; content: string; createdAt: string;
+}
+export interface ChatPage { channelId: number; messages: ChatMessage[]; hasMore: boolean }
 export interface VoicePeer { connectionId: string; userId: number; username: string; avatarUrl: string | null; muted: boolean; deafened: boolean }
 export interface ServerDetail extends ServerSummary {
   channels: VoiceChannel[];
-  textChannels?: TextChannel[];
+  textChannels: TextChannel[];
   members: { userId: number; username: string; displayName: string | null; avatarUrl: string | null }[];
   presence: Record<string, VoicePeer[]>;
 }

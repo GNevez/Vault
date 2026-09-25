@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DownloadItem } from '../../hooks/useApi';
+import { coverOf, featuredFor } from '../../lib/featured-games';
 
 export type GamesTab = 'catalog' | 'library' | 'downloads' | 'fonte';
 
@@ -12,10 +13,12 @@ const hueOf = (text: string) => {
 const initialsOf = (title: string) => title.split(/[^0-9A-Za-zÀ-ÿ]+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || '?';
 
 /**
- * Sources don't provide cover art yet, so each game gets a quiet, deterministic
- * tint derived from its title instead of a generic placeholder.
+ * Sources don't provide cover art, so curated games use their bundled cover and every
+ * other game gets a quiet, deterministic tint derived from its title.
  */
 export function GameArt({ title, className = '', size = 'md' }: { title: string; className?: string; size?: 'sm' | 'md' | 'lg' }) {
+  const featured = featuredFor(title);
+  if (featured) return <img src={coverOf(featured)} alt="" aria-hidden loading="lazy" draggable={false} className={`object-cover ${className}`} />;
   const hue = hueOf(title);
   const text = { sm: 'text-sm', md: 'text-4xl', lg: 'text-[88px]' }[size];
   return (

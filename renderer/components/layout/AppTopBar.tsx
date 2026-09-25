@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Gamepad2, Headphones, LayoutGrid, LogOut, Settings, User, Users } from 'lucide-react';
 import { Avatar } from '../social/Avatar';
 import { WindowControls } from '../ui/TitleBar';
+import { BrandWordmark } from '../ui/Brand';
 
 export type AppModule = 'community' | 'games' | 'servers';
 
@@ -45,7 +46,7 @@ export function AppTopBar({ active, username, inVoice, onNavigate, onLogout }: P
 
   return (
     <header className="flex h-13 shrink-0 select-none items-stretch border-b border-line bg-panel" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-      <div className="flex shrink-0 items-center pl-5 pr-6 text-[15px] font-extrabold tracking-[0.14em] text-zinc-50 xl:w-64">VAULT</div>
+      <div className="flex shrink-0 items-center pl-5 pr-6 xl:w-64"><BrandWordmark className="h-[18px] w-auto" /></div>
 
       <nav aria-label="Módulos" className="flex items-stretch gap-1 pl-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {MODULES.map(({ id, section, label, icon: Icon }) => {

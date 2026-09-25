@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Pause, Play, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useDownloads, useLibrary, useSources, type DownloadItem, type DownloadsApi } from "../../hooks/useApi";
 import { Catalog } from "./Catalog";
 import { Downloads } from "./Downloads";
 import { Fonte } from "./Fonte";
+import { GameSearch } from "./GameSearch";
 import { Library } from "./Library";
 import { GameArt, formatBytes, formatSpeed, downloadState, iconButton, isPausedDownload, isPendingDownload, type GamesTab } from "./gameUi";
 
@@ -20,9 +21,21 @@ export function GamesWorkspace({ tab, onTab }: { tab: GamesTab; onTab: (tab: Gam
   const library = useLibrary();
   const downloads = useDownloads(2000);
   const [query, setQuery] = useState("");
+  // Discover searches every source in a modal; the other tabs filter their own list in place.
+  const [searching, setSearching] = useState<string | null>(null);
+  const discover = tab === "catalog";
 
   // Each tab has its own search context.
-  useEffect(() => setQuery(""), [tab]);
+  useEffect(() => { setQuery(""); setSearching(null); }, [tab]);
+
+  useEffect(() => {
+    if (!discover) return;
+    const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearching(s => s ?? ""); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [discover]);
+
+  const closeSearch = useCallback(() => { setSearching(null); setQuery(""); }, []);
 
   const pending = downloads.downloads.filter(isPendingDownload);
   const active = tab === "downloads" ? undefined : pending[0];
@@ -31,24 +44,28 @@ export function GamesWorkspace({ tab, onTab }: { tab: GamesTab; onTab: (tab: Gam
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <div className="vault-scroll min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1480px] px-8 pb-10 pt-7">
+        <div className="@container mx-auto w-full max-w-[1480px] px-8 pb-10 pt-7">
           <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-[28px] font-bold leading-tight tracking-tight text-zinc-50">Games</h1>
-              <p className="mt-1 text-sm text-zinc-500">Catálogo, biblioteca e downloads em um só lugar.</p>
+              <p className="mt-1 text-sm text-zinc-500">Seu próximo jogo começa aqui.</p>
             </div>
             <div className="relative w-full max-w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <input
                 type="search"
                 value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === "Escape") setQuery(""); }}
+                onChange={e => { setQuery(e.target.value); if (discover) setSearching(e.target.value); }}
+                onMouseDown={e => { if (discover) { e.preventDefault(); setSearching(query); } }}
+                onKeyDown={e => { if (e.key === "Escape") setQuery(""); if (discover && e.key === "Enter") setSearching(query); }}
                 placeholder={current.search}
                 aria-label={current.search}
-                className="h-10 w-full rounded-md border border-line bg-raised pl-9 pr-9 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-accent/60 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                aria-haspopup={discover ? "dialog" : undefined}
+                className="h-10 w-full rounded-md border border-line bg-raised pl-9 pr-12 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-accent/60 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
               />
-              {query && <button onClick={() => setQuery("")} aria-label="Limpar busca" className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-zinc-500 hover:text-zinc-200"><X size={14} /></button>}
+              {discover
+                ? <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">Ctrl K</kbd>
+                : query && <button onClick={() => setQuery("")} aria-label="Limpar busca" className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-zinc-500 hover:text-zinc-200"><X size={14} /></button>}
             </div>
           </header>
 
@@ -72,7 +89,7 @@ export function GamesWorkspace({ tab, onTab }: { tab: GamesTab; onTab: (tab: Gam
           </nav>
 
           <div role="tabpanel" aria-label={current.label}>
-            {tab === "catalog" && <Catalog query={query} sources={sources} library={library} onTab={onTab} onClearQuery={() => setQuery("")} />}
+            {tab === "catalog" && <Catalog sources={sources} library={library} onTab={onTab} onFind={setSearching} />}
             {tab === "library" && <Library query={query} library={library} onTab={onTab} onDownloadStarted={() => void downloads.reload()} />}
             {tab === "downloads" && <Downloads query={query} downloads={downloads} onTab={onTab} />}
             {tab === "fonte" && <Fonte query={query} sources={sources} />}
@@ -81,6 +98,7 @@ export function GamesWorkspace({ tab, onTab }: { tab: GamesTab; onTab: (tab: Gam
       </div>
 
       {active && <DownloadStrip item={active} more={pending.length - 1} api={downloads} onOpen={() => onTab("downloads")} />}
+      {searching !== null && <GameSearch initialQuery={searching} library={library} hasSources={sources.loading || sources.sources.length > 0} onTab={onTab} onClose={closeSearch} />}
     </div>
   );
 }

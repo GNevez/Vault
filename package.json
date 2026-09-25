@@ -7,6 +7,7 @@
   "main": "app/background.js",
   "scripts": {
     "dev": "nextron",
+    "dev:2": "electron . 8888 --profile=2",
     "build": "nextron build",
     "test:voice": "node --test tests/voice-engine.test.cjs",
     "postinstall": "electron-builder install-app-deps"

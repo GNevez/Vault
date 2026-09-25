@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Hash, Headphones, Loader2, Plus, SendHorizontal, Users } from 'lucide-react';
+import { Hash, Headphones, Loader2, Users } from 'lucide-react';
 import { ServerDetail } from '../../types/servers';
 import { Avatar } from '../social/Avatar';
+import { ChannelChat } from './ChannelChat';
 import { primaryClass, secondaryClass } from './ServerDialog';
 import { useVoice } from './VoiceProvider';
 
@@ -15,7 +16,8 @@ interface Props {
 /** Main area of the Servers module: the selected text channel of the selected server. */
 export function ServersWorkspace({ serverId, textChannelId, username, hasServers, listLoading, listError, refreshServers, server, error, reload, onManage }: Props) {
   const { voice } = useVoice();
-  const [membersOpen, setMembersOpen] = useState(true);
+  // Wide windows show the member list beside the chat; narrow ones open it as an overlay on demand.
+  const [membersOpen, setMembersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 1280);
 
   if (!serverId) {
     if (listLoading) return <div className="grid flex-1 place-items-center"><Loader2 className="animate-spin text-zinc-500" /></div>;
@@ -40,7 +42,7 @@ export function ServersWorkspace({ serverId, textChannelId, username, hasServers
   const self = server?.members.find(m => m.username.toLowerCase() === username.toLowerCase());
   if (self && voice.session?.serverId === serverId) inVoice.add(self.userId);
 
-  return <section className="flex min-h-0 min-w-0 flex-1">
+  return <section className="@container relative flex min-h-0 min-w-0 flex-1">
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-6">
         <Hash size={18} className="shrink-0 text-zinc-500" />
@@ -53,31 +55,12 @@ export function ServersWorkspace({ serverId, textChannelId, username, hasServers
         {server && <button onClick={() => setMembersOpen(open => !open)} aria-pressed={membersOpen} title={membersOpen ? 'Ocultar membros' : 'Mostrar membros'} className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition ${membersOpen ? 'bg-raised text-zinc-200' : 'text-zinc-500 hover:bg-raised hover:text-zinc-200'}`}><Users size={15} />{server.memberCount}</button>}
       </header>
 
-      <div className="vault-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6">
-        {error && <div role="alert" className="mb-4 rounded-lg border border-red-900/40 bg-red-500/5 p-4 text-sm text-red-400">{error}<button onClick={reload} className="ml-3 underline">Tentar novamente</button></div>}
-        {!server && !error ? <Loader2 className="m-auto animate-spin text-zinc-500" /> : server && <div className="mt-auto max-w-2xl">
-          <span className="grid h-14 w-14 place-items-center rounded-lg bg-raised text-zinc-400"><Hash size={26} /></span>
-          {channel ? <>
-            <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">Bem-vindo a #{channel.name}</h2>
-            <p className="mt-1.5 text-sm leading-6 text-zinc-500">Este é o começo do canal #{channel.name} em {server.name}.</p>
-          </> : <>
-            <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-50">Canais de texto em breve</h2>
-            <p className="mt-1.5 text-sm leading-6 text-zinc-500">{server.name} ainda não tem canais de texto. Enquanto isso, entre em um canal de voz pela lateral — a chamada continua enquanto você navega pelo VAULT.</p>
-          </>}
-        </div>}
-      </div>
-
-      <div className="shrink-0 px-6 pb-5">
-        <div aria-disabled className="flex h-12 items-center gap-2 rounded-lg border border-line bg-raised px-2 opacity-70">
-          <button disabled aria-label="Anexar" className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 disabled:cursor-not-allowed"><Plus size={18} /></button>
-          <input disabled aria-label="Mensagem" placeholder={channel ? `Conversar em #${channel.name}` : 'Nenhum canal de texto selecionado'} className="min-w-0 flex-1 bg-transparent text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed" />
-          <button disabled aria-label="Enviar" className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 disabled:cursor-not-allowed"><SendHorizontal size={17} /></button>
-        </div>
-        <p className="mt-1.5 px-1 text-[11px] text-zinc-600">O envio de mensagens será habilitado em breve.</p>
-      </div>
+      {error && <div role="alert" className="mx-6 mt-4 rounded-lg border border-red-900/40 bg-red-500/5 p-4 text-sm text-red-400">{error}<button onClick={reload} className="ml-3 underline">Tentar novamente</button></div>}
+      {/* Stays mounted across servers so the chat connection is reused; it only switches rooms. */}
+      <ChannelChat channel={channel} serverName={server?.name} pending={!server && !error} />
     </div>
 
-    {membersOpen && server && <aside aria-label="Membros" className="vault-scroll hidden w-60 shrink-0 overflow-y-auto border-l border-line bg-panel px-3 py-4 lg:block">
+    {membersOpen && server && <aside aria-label="Membros" className="vault-scroll absolute inset-y-0 right-0 z-20 w-60 shrink-0 overflow-y-auto border-l border-line bg-panel px-3 py-4 shadow-2xl shadow-black/50 @4xl:static @4xl:shadow-none">
       <h2 className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Membros · {server.memberCount}</h2>
       <ul className="space-y-0.5">
         {server.members.map(member => <li key={member.userId} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-raised/60">

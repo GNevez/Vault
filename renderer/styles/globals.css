@@ -2,6 +2,9 @@
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined');
 @import "tailwindcss";
 
+/* Short windows (min height is 640px): secondary panels tighten up. */
+@custom-variant short (@media (max-height: 760px));
+
 @theme {
   --color-primary: #ffffff;
   --color-secondary: #f4f4f5;
@@ -43,9 +46,20 @@ html, body {
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px var(--color-input-bg) inset;
-  -webkit-text-fill-color: #ffffff;
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-panel) inset;
+  -webkit-text-fill-color: #f4f4f5;
+  caret-color: #f4f4f5;
   transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Sign-in screens: content settles in, the backdrop fades in once its image has loaded. */
+@keyframes vault-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.vault-rise { animation: vault-rise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .vault-rise { animation: none; }
 }
 
 /* Scrollbars are only visible in panels that can actually scroll. */

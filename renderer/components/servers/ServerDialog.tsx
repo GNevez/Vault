@@ -37,7 +37,7 @@ export function ServerManager({ mode, onClose, onComplete }: { mode: 'create' | 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return <ServerDialog title={mode === 'create' ? 'Criar servidor' : 'Entrar em um servidor'} onClose={onClose} busy={busy}>
-    <p className="mb-5 text-sm leading-6 text-zinc-500">{mode === 'create' ? 'Um lugar para o seu grupo. Comece com um canal de voz e convide seus amigos.' : 'Cole o código de convite compartilhado pelo dono do servidor.'}</p>
+    <p className="mb-5 text-sm leading-6 text-zinc-500">{mode === 'create' ? 'Um lugar para o seu grupo. Comece com o #geral e um canal de voz, e convide seus amigos.' : 'Cole o código de convite compartilhado pelo dono do servidor.'}</p>
     <form onSubmit={async e => {
       e.preventDefault(); if (busy) return; const form = new FormData(e.currentTarget); setBusy(true); setError('');
       try {

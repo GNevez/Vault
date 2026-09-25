@@ -6,7 +6,7 @@ import '../styles/globals.css'
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <div
-      className="relative h-screen w-screen flex flex-col overflow-hidden rounded-[12px] border border-border-thin bg-background-dark"
+      className="relative h-screen w-screen flex flex-col overflow-hidden bg-background-dark"
       style={{ WebkitAppRegion: "drag" } as any}
     >
       <div className="min-h-0 flex-1 overflow-hidden">

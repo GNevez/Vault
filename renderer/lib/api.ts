@@ -1,3 +1,8 @@
+/** HTTP failure with the status (0 = network) and the parsed JSON body, e.g. `{ message, field }`. */
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public data?: any) { super(message); }
+}
+
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
   const headers = new Headers(options.headers);
@@ -5,19 +10,24 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${baseUrl}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${endpoint}`, { ...options, headers });
+  } catch {
+    throw new ApiError('Não foi possível conectar ao servidor. Verifique sua conexão.', 0);
+  }
 
   if (!response.ok) {
-    let errorMsg = response.status === 401 ? 'Your session expired. Please sign in again.' : `Request failed (${response.status})`;
+    let errorMsg = response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : `A requisição falhou (${response.status}).`;
+    let errorData: any;
     const body = await response.text();
     try {
-      const errorData = JSON.parse(body);
-      errorMsg = errorData.message || errorData.title || errorMsg;
+      errorData = JSON.parse(body);
+      // ASP.NET validation failures carry the useful text in `errors`, not in `title`.
+      const validation = errorData.errors && Object.values(errorData.errors).flat()[0];
+      errorMsg = errorData.message || (typeof validation === 'string' ? validation : '') || errorData.title || errorMsg;
     } catch { /* Keep the safe status message for non-JSON responses. */ }
-    throw new Error(errorMsg);
+    throw new ApiError(errorMsg, response.status, errorData);
   }
 
   if (response.status === 204) return null;

@@ -1,18 +1,25 @@
-import React from 'react'
-import { Minus, Square, X } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { Copy, Minus, Square, X } from 'lucide-react'
 
 /** Minimize / maximize / close for the frameless Electron window. */
-export function WindowControls({ className = '' }: { className?: string }) {
+export function WindowControls({ className = '', maximize = true }: { className?: string; maximize?: boolean }) {
+  const [maximized, setMaximized] = useState(false)
+  useEffect(() => {
+    if (!maximize || !window.ipc) return
+    window.ipc.invoke('window-state').then((s: any) => setMaximized(!!s?.maximized)).catch(() => {})
+    return window.ipc.on('window-state', (s: any) => setMaximized(!!(s as { maximized?: boolean })?.maximized))
+  }, [maximize])
+
   const button = 'flex items-center justify-center w-12 h-full text-zinc-500 hover:bg-white/5 hover:text-white transition-colors'
   return (
     <div className={`flex h-full ${className}`} style={{ WebkitAppRegion: 'no-drag' } as any}>
-      <button aria-label="Minimizar" onClick={() => window.ipc?.send('window-minimize', null)} className={button}>
+      <button aria-label="Minimizar" title="Minimizar" onClick={() => window.ipc?.send('window-minimize', null)} className={button}>
         <Minus className="w-4 h-4" />
       </button>
-      <button aria-label="Maximizar" onClick={() => window.ipc?.send('window-maximize', null)} className={button}>
-        <Square className="w-3.5 h-3.5" />
-      </button>
-      <button aria-label="Fechar" onClick={() => window.ipc?.send('window-close', null)} className={`${button} hover:bg-red-500`}>
+      {maximize && <button aria-label={maximized ? 'Restaurar' : 'Maximizar'} title={maximized ? 'Restaurar' : 'Maximizar'} onClick={() => window.ipc?.send('window-maximize', null)} className={button}>
+        {maximized ? <Copy className="w-3.5 h-3.5 -scale-x-100" /> : <Square className="w-3.5 h-3.5" />}
+      </button>}
+      <button aria-label="Fechar" title="Fechar" onClick={() => window.ipc?.send('window-close', null)} className={`${button} hover:bg-red-500`}>
         <X className="w-4 h-4" />
       </button>
     </div>

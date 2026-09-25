@@ -76,9 +76,10 @@ export const createWindow = (
   const win = new BrowserWindow({
     ...state,
     ...options,
+    // Opaque on purpose: transparent windows on Windows lose resize borders, maximize and Aero Snap.
+    // Windows 11 still rounds the corners of this frameless window natively.
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    backgroundColor: '#0f0f11',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

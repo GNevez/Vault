@@ -12,6 +12,9 @@ import { VoiceProvider, useVoice } from '../components/servers/VoiceProvider';
 import { ServersWorkspace } from '../components/servers/ServersWorkspace';
 import { ServerManager } from '../components/servers/ServerDialog';
 import { useServerDetail, useServers } from '../hooks/useServers';
+import { SettingsWorkspace, isSettingsTab } from '../components/settings/SettingsWorkspace';
+import { applyZoom } from '../lib/app-settings';
+import { clearSession } from '../lib/session';
 
 const GAMES_TABS: GamesTab[] = ['catalog', 'library', 'downloads', 'fonte'];
 const SIDEBAR_KEY = 'vault.sidebarCollapsed';
@@ -49,6 +52,7 @@ function DashboardContent() {
     if (stored) setUsername(stored);
     try { setSidebarCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1'); } catch {}
     window.ipc?.send('window-enter-dashboard', null);
+    applyZoom();
   }, []);
 
   const toggleSidebar = () => setSidebarCollapsed(value => {
@@ -58,8 +62,7 @@ function DashboardContent() {
 
   const handleLogout = async () => {
     await engine.disconnect();
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
+    clearSession();
     window.ipc?.send('window-enter-login', null);
     router.push('/home');
   };
@@ -100,11 +103,12 @@ function DashboardContent() {
       case 'profile':
         return <UserProfile target="me" username={username} />;
       case 'settings':
-        return (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-zinc-500">Configurações — em breve</p>
-          </div>
-        );
+        return <SettingsWorkspace
+          tab={isSettingsTab(router.query.tab) ? router.query.tab : 'account'}
+          onTab={tab => void router.push({ pathname: '/dashboard', query: { section: 'settings', tab } }, undefined, { shallow: true })}
+          onViewProfile={() => handleNavigate('profile')}
+          onLogout={() => void handleLogout()}
+        />;
       default:
         return <SocialFeed username={username || 'Player'} />;
     }

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch } from '../../lib/api';
-import { ServerDetail, VoiceChannel } from '../../types/servers';
+import { ServerDetail, TextChannel, VoiceChannel } from '../../types/servers';
 import { fieldClass, primaryClass, ServerDialog } from './ServerDialog';
 
-export type ServerAction = { kind: 'invite' } | { kind: 'voice-channel' } | { kind: 'leave' } | { kind: 'delete-channel'; channel: VoiceChannel };
+export type ServerAction = { kind: 'invite' } | { kind: 'voice-channel' } | { kind: 'text-channel' } | { kind: 'leave' }
+  | { kind: 'delete-channel'; channel: VoiceChannel } | { kind: 'delete-text-channel'; channel: TextChannel };
 
 interface Props {
   action: ServerAction;
@@ -24,7 +25,8 @@ export function ServerActionDialog({ action, server, onClose, onChanged, onRemov
     if (busy) return; setBusy(true);
     try { await run(); } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
   };
-  const title = action.kind === 'voice-channel' ? 'Criar canal de voz' : action.kind === 'invite' ? 'Convide seus amigos' : action.kind === 'delete-channel' ? 'Excluir canal de voz?' : server.isOwner ? 'Excluir este servidor?' : 'Sair deste servidor?';
+  const title = action.kind === 'voice-channel' ? 'Criar canal de voz' : action.kind === 'text-channel' ? 'Criar canal de texto' : action.kind === 'invite' ? 'Convide seus amigos'
+    : action.kind === 'delete-channel' ? 'Excluir canal de voz?' : action.kind === 'delete-text-channel' ? 'Excluir canal de texto?' : server.isOwner ? 'Excluir este servidor?' : 'Sair deste servidor?';
 
   return <ServerDialog title={title} onClose={onClose} busy={busy}>
     {action.kind === 'voice-channel' && <form onSubmit={e => {
@@ -36,6 +38,15 @@ export function ServerActionDialog({ action, server, onClose, onChanged, onRemov
       <button disabled={busy} className={`${primaryClass} mt-6 w-full`}>Criar canal</button>
     </form>}
 
+    {action.kind === 'text-channel' && <form onSubmit={e => {
+      e.preventDefault(); const data = new FormData(e.currentTarget);
+      void act(async () => { await authFetch(`/api/Servers/${server.id}/text-channels`, { method: 'POST', body: JSON.stringify({ name: data.get('name'), topic: data.get('topic') }) }); onClose(); onChanged(); });
+    }}>
+      <label className="block text-xs text-zinc-400">Nome do canal<input name="name" required maxLength={60} className={fieldClass} placeholder="off-topic" /></label>
+      <label className="mt-4 block text-xs text-zinc-400">Tópico <span className="text-zinc-500">(opcional)</span><input name="topic" maxLength={200} className={fieldClass} placeholder="Sobre o que é este canal?" /></label>
+      <button disabled={busy} className={`${primaryClass} mt-6 w-full`}>Criar canal</button>
+    </form>}
+
     {action.kind === 'invite' && <>
       <p className="text-sm leading-6 text-zinc-500">Os códigos de convite expiram em 7 dias e permitem até 100 entradas. Gerar um novo código substitui o anterior.</p>
       {invite ? <>
@@ -44,17 +55,17 @@ export function ServerActionDialog({ action, server, onClose, onChanged, onRemov
       </> : <button disabled={busy} onClick={() => void act(async () => { const result = await authFetch(`/api/Servers/${server.id}/invites`, { method: 'POST' }); setInvite(result.code); })} className={`${primaryClass} mt-6 w-full`}>{busy ? 'Gerando…' : 'Gerar convite'}</button>}
     </>}
 
-    {(action.kind === 'leave' || action.kind === 'delete-channel') && <>
-      <p className="text-sm leading-6 text-zinc-400">{action.kind === 'delete-channel' ? `Remover ${action.channel.name}? Todos neste canal serão desconectados.` : server.isOwner ? `Excluir permanentemente ${server.name}, com canais, membros e convites? Todos serão desconectados.` : `Sair de ${server.name}? Você precisará de um novo convite para voltar.`}</p>
+    {(action.kind === 'leave' || action.kind === 'delete-channel' || action.kind === 'delete-text-channel') && <>
+      <p className="text-sm leading-6 text-zinc-400">{action.kind === 'delete-channel' ? `Remover ${action.channel.name}? Todos neste canal serão desconectados.` : action.kind === 'delete-text-channel' ? `Remover #${action.channel.name}? Todo o histórico de mensagens do canal será apagado.` : server.isOwner ? `Excluir permanentemente ${server.name}, com canais, membros e convites? Todos serão desconectados.` : `Sair de ${server.name}? Você precisará de um novo convite para voltar.`}</p>
       <button disabled={busy} onClick={() => void act(async () => {
-        if (action.kind === 'delete-channel') {
-          await authFetch(`/api/Servers/${server.id}/channels/${action.channel.id}`, { method: 'DELETE' });
+        if (action.kind === 'delete-channel' || action.kind === 'delete-text-channel') {
+          await authFetch(`/api/Servers/${server.id}/${action.kind === 'delete-channel' ? 'channels' : 'text-channels'}/${action.channel.id}`, { method: 'DELETE' });
           onClose(); onChanged();
         } else {
           await authFetch(`/api/Servers/${server.id}${server.isOwner ? '' : '/membership'}`, { method: 'DELETE' });
           onClose(); await onRemoved();
         }
-      })} className="mt-6 w-full rounded-md bg-red-500/15 px-4 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/25 disabled:opacity-50">{busy ? 'Processando…' : action.kind === 'delete-channel' ? 'Excluir canal' : server.isOwner ? 'Excluir servidor' : 'Sair do servidor'}</button>
+      })} className="mt-6 w-full rounded-md bg-red-500/15 px-4 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/25 disabled:opacity-50">{busy ? 'Processando…' : action.kind === 'delete-channel' || action.kind === 'delete-text-channel' ? 'Excluir canal' : server.isOwner ? 'Excluir servidor' : 'Sair do servidor'}</button>
     </>}
   </ServerDialog>;
 }

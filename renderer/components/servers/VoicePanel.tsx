@@ -29,7 +29,7 @@ export function VoicePanel({ username, compact, onOpen }: { username: string; co
   }
 
   const shownPeers = voice.peers.slice(0, 5);
-  return <section aria-label="Chamada de voz" className="m-3 rounded-lg border border-line bg-raised p-3">
+  return <section aria-label="Chamada de voz" className="m-3 rounded-lg border border-line bg-raised p-3 short:m-2 short:p-2.5">
     <div className="flex items-start gap-2">
       {busy ? <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-zinc-400" /> : <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${failed ? 'bg-red-400' : 'bg-emerald-400'}`} />}
       <div className="min-w-0 flex-1">
@@ -38,7 +38,7 @@ export function VoicePanel({ username, compact, onOpen }: { username: string; co
       </div>
     </div>
 
-    {session && <div className="mt-3 flex items-center">
+    {session && <div className="mt-3 flex items-center short:hidden">
       <span className="rounded-full ring-2 ring-raised"><Avatar username={username || 'V'} size="sm" /></span>
       {shownPeers.map(peer => <span key={peer.connectionId} title={peer.username} className="-ml-2 rounded-full ring-2 ring-raised"><Avatar username={peer.username} src={peer.avatarUrl} size="sm" /></span>)}
       {voice.peers.length > shownPeers.length && <span className="-ml-2 grid h-8 w-8 place-items-center rounded-full bg-panel text-[10px] font-semibold text-zinc-400 ring-2 ring-raised">+{voice.peers.length - shownPeers.length}</span>}
@@ -47,7 +47,7 @@ export function VoicePanel({ username, compact, onOpen }: { username: string; co
 
     {voice.playbackBlocked && <button onClick={() => void engine.resumeAudio()} className="mt-3 w-full rounded-md border border-accent/40 py-1.5 text-xs font-medium text-accent hover:bg-accent/10">Ativar áudio da chamada</button>}
 
-    {session && <label className="mt-3 flex items-center gap-2 text-zinc-500">
+    {session && <label className="mt-3 flex items-center gap-2 text-zinc-500 short:hidden">
       <Volume2 size={14} className="shrink-0" />
       <span className="sr-only">Volume da chamada</span>
       <input aria-label="Volume da chamada" type="range" min={0} max={1} step={0.05} value={voice.volume} onChange={e => engine.setVolume(Number(e.target.value))} className="h-1 w-full accent-[#d4a24e]" />

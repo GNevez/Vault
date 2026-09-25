@@ -129,6 +129,7 @@ export function ServerSidebar({ username, servers, loading, error, focusedId, de
         </button>
         {menu === 'server' && detail && <div role="menu" className="absolute inset-x-0 top-full z-[70] mt-1 rounded-lg border border-line bg-panel p-1.5 shadow-2xl shadow-black/60">
           {detail.isOwner && <button role="menuitem" onClick={() => openAction({ kind: 'invite' })} className={menuItem}><UserPlus size={15} className="text-zinc-500" />Convidar pessoas</button>}
+          {detail.isOwner && <button role="menuitem" onClick={() => openAction({ kind: 'text-channel' })} className={menuItem}><Hash size={15} className="text-zinc-500" />Criar canal de texto</button>}
           {detail.isOwner && <button role="menuitem" onClick={() => openAction({ kind: 'voice-channel' })} className={menuItem}><Volume2 size={15} className="text-zinc-500" />Criar canal de voz</button>}
           {detail.isOwner && <div className="my-1 h-px bg-line" />}
           <button role="menuitem" onClick={() => openAction({ kind: 'leave' })} className={`${menuItem} text-red-400 hover:text-red-300`}>{detail.isOwner ? <Trash2 size={15} /> : <LogOut size={15} />}{detail.isOwner ? 'Excluir servidor' : 'Sair do servidor'}</button>
@@ -140,13 +141,20 @@ export function ServerSidebar({ username, servers, loading, error, focusedId, de
 
       {detail && <>
         <section aria-label="Canais de texto">
-          <h3 className={`mb-1.5 pl-2 ${sectionTitle}`}>Canais de texto</h3>
+          <div className="mb-1.5 flex items-center pl-2">
+            <h3 className={`flex-1 ${sectionTitle}`}>Canais de texto</h3>
+            {detail.isOwner && <button onClick={() => openAction({ kind: 'text-channel' })} aria-label="Criar canal de texto" title="Criar canal de texto" className="grid h-6 w-6 place-items-center rounded text-zinc-500 hover:bg-raised hover:text-zinc-200"><Plus size={14} /></button>}
+          </div>
           {textChannels.length ? textChannels.map(channel => {
             const active = activeText?.id === channel.id;
-            return <button key={channel.id} onClick={() => onOpen(detail.id, channel.id)} aria-current={active ? 'page' : undefined} className={`mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition ${active ? 'bg-raised font-medium text-zinc-50' : 'text-zinc-400 hover:bg-raised/60 hover:text-zinc-100'}`}>
-              <Hash size={16} className={active ? 'text-zinc-300' : 'text-zinc-500'} /><span className="min-w-0 flex-1 truncate">{channel.name}</span>
-            </button>;
-          }) : <button onClick={() => onOpen(detail.id)} className="w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-600 hover:text-zinc-400">Nenhum canal de texto ainda.</button>}
+            const deletable = detail.isOwner && textChannels.length > 1;
+            return <div key={channel.id} className={`group mb-0.5 flex items-center rounded-md transition ${active ? 'bg-raised' : 'hover:bg-raised/60'}`}>
+              <button onClick={() => onOpen(detail.id, channel.id)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left text-[13px] ${active ? 'font-medium text-zinc-50' : 'text-zinc-400 hover:text-zinc-100'}`}>
+                <Hash size={16} className={active ? 'text-zinc-300' : 'text-zinc-500'} /><span className="min-w-0 flex-1 truncate">{channel.name}</span>
+              </button>
+              {deletable && <button onClick={() => openAction({ kind: 'delete-text-channel', channel })} aria-label={`Excluir canal ${channel.name}`} title="Excluir canal" className="mr-1 hidden h-6 w-6 place-items-center rounded text-zinc-500 hover:text-red-400 group-hover:grid focus:grid"><Trash2 size={13} /></button>}
+            </div>;
+          }) :<button onClick={() => onOpen(detail.id)} className="w-full rounded-md px-2 py-1.5 text-left text-xs text-zinc-600 hover:text-zinc-400">Nenhum canal de texto ainda.</button>}
         </section>
 
         <section aria-label="Canais de voz" className="mt-5">

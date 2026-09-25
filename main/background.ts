@@ -1,8 +1,8 @@
 import path from 'path'
 import fs from 'fs'
-import { app, ipcMain, BrowserWindow, dialog } from 'electron'
+import { app, ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import serve from 'electron-serve'
-import { createWindow } from './helpers'
+import { createWindow, enterApp, enterLogin, inApp, setZoom, trackWindow } from './helpers'
 
 const isProd = process.env.NODE_ENV === 'production'
 const logFile = path.join(app.getPath('userData'), 'debug.log')
@@ -15,9 +15,19 @@ function log(msg: string) {
 app.disableHardwareAcceleration()
 
 if (isProd) {
+  // Produção: só uma instância. Uma segunda tentativa foca a janela existente.
+  if (!app.requestSingleInstanceLock()) app.exit(0)
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  })
   serve({ directory: 'app' })
 } else {
-  app.setPath('userData', `${app.getPath('userData')} (development)`)
+  // Dev: `--profile=<nome>` isola userData (localStorage/token) para rodar várias instâncias.
+  const profile = process.argv.find(arg => arg.startsWith('--profile='))?.slice('--profile='.length)
+  app.setPath('userData', `${app.getPath('userData')} (development${profile ? ` ${profile}` : ''})`)
 }
 
 ;(async () => {
@@ -37,6 +47,7 @@ if (isProd) {
   })
 
   mainWindow.center()
+  trackWindow(mainWindow)
 
   const trustedPage = (value: string) => {
     try {
@@ -46,12 +57,12 @@ if (isProd) {
   }
   mainWindow.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => {
     if (contents !== mainWindow.webContents || !details.isMainFrame || !trustedPage(details.requestingUrl || contents.getURL())) return false
-    return permission === 'media' ? details.mediaType === 'audio' : permission === 'clipboard-sanitized-write' || permission === 'fullscreen'
+    return permission === 'media' ? details.mediaType === 'audio' : permission === 'clipboard-sanitized-write' || permission === 'fullscreen' || permission === 'notifications'
   })
   mainWindow.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
     const trusted = contents === mainWindow.webContents && details.isMainFrame && trustedPage(details.requestingUrl)
     const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined
-    callback(!!trusted && (permission === 'media' ? !!mediaTypes?.length && mediaTypes.every(type => type === 'audio') : permission === 'clipboard-sanitized-write' || permission === 'fullscreen'))
+    callback(!!trusted && (permission === 'media' ? !!mediaTypes?.length && mediaTypes.every(type => type === 'audio') : permission === 'clipboard-sanitized-write' || permission === 'fullscreen' || permission === 'speaker-selection' || permission === 'notifications'))
   })
 
   log('Window created')
@@ -89,7 +100,7 @@ if (isProd) {
   }
 
   mainWindow.webContents.on('before-input-event', (_event, input) => {
-    if (input.type === 'keyDown' && input.key === 'F11') {
+    if (input.type === 'keyDown' && input.key === 'F11' && inApp()) {
       mainWindow.setFullScreen(!mainWindow.isFullScreen())
     }
     if (input.type === 'keyDown' && input.key === 'F12') {
@@ -106,48 +117,47 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
+const senderWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(event.sender)
+
+ipcMain.on('app-set-zoom', (event, value) => {
+  const win = senderWindow(event)
+  const factor = Number(value)
+  if (win && Number.isFinite(factor)) setZoom(win, factor)
+})
+
+ipcMain.handle('app-info', () => ({
+  version: app.getVersion(),
+  electron: process.versions.electron,
+  chrome: process.versions.chrome,
+  platform: `${process.platform} ${process.arch}`,
+}))
+
+// The OS display language (e.g. "pt-BR"), not Chromium's UI locale.
+ipcMain.handle('app-system-language', () => app.getPreferredSystemLanguages()[0] ?? app.getLocale())
+
+ipcMain.handle('app-open-logs', () => shell.openPath(app.getPath('userData')))
+
 ipcMain.on('message', async (event, arg) => {
   event.reply('message', `${arg} World!`)
 })
 
-ipcMain.on('window-minimize', () => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (win) win.minimize()
+ipcMain.on('window-minimize', event => senderWindow(event)?.minimize())
+
+ipcMain.on('window-maximize', event => {
+  const win = senderWindow(event)
+  if (!win || !inApp()) return
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
 })
 
-ipcMain.on('window-maximize', () => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (win) {
-    if (win.isMaximized()) {
-      win.unmaximize()
-    } else {
-      win.maximize()
-    }
-  }
+ipcMain.on('window-close', event => senderWindow(event)?.close())
+
+ipcMain.handle('window-state', event => {
+  const win = senderWindow(event)
+  return { maximized: !!win?.isMaximized(), fullScreen: !!win?.isFullScreen() }
 })
 
-ipcMain.on('window-close', () => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (win) win.close()
-})
-
-ipcMain.on('window-enter-dashboard', () => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (win) {
-    win.setResizable(true)
-    win.setMaximizable(true)
-    win.setMinimumSize(960, 640)
-    win.setSize(1280, 820, true)
-    win.center()
-  }
-})
-
-ipcMain.on('window-enter-login', () => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (win) {
-    win.setResizable(false)
-    win.setMaximizable(false)
-    win.setSize(460, 680, true)
-    win.center()
-  }
-})
+// Sent by the renderer when it shows the app or the sign-in screen. Uses the sender's window,
+// not the focused one: after an automatic sign-in at launch the window may not have focus yet.
+ipcMain.on('window-enter-dashboard', event => { const win = senderWindow(event); if (win) enterApp(win) })
+ipcMain.on('window-enter-login', event => { const win = senderWindow(event); if (win) enterLogin(win) })
