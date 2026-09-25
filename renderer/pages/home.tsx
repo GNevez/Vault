@@ -9,7 +9,7 @@ export default function HomePage() {
   return (
     <>
       <Head>
-        <title>{view === 'login' ? 'Login' : 'Register'} - Vault</title>
+        <title>{`${view === 'login' ? 'Login' : 'Register'} - Vault`}</title>
       </Head>
 
       <main className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 bg-background-dark text-white">

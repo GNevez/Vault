@@ -10,6 +10,11 @@
     "build": "nextron build",
     "postinstall": "electron-builder install-app-deps"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
   "dependencies": {
     "@babel/runtime-corejs3": "^7.29.2",
     "electron-serve": "^1.3.0",

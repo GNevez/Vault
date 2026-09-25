@@ -3,15 +3,15 @@ import { Minus, Square, X } from 'lucide-react'
 
 export function TitleBar() {
   const handleMinimize = () => {
-    window.ipc.send('window-minimize', null)
+    window.ipc?.send('window-minimize', null)
   }
 
   const handleMaximize = () => {
-    window.ipc.send('window-maximize', null)
+    window.ipc?.send('window-maximize', null)
   }
 
   const handleClose = () => {
-    window.ipc.send('window-close', null)
+    window.ipc?.send('window-close', null)
   }
 
   return (

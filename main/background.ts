@@ -119,8 +119,8 @@ ipcMain.on('window-enter-dashboard', () => {
   if (win) {
     win.setResizable(true)
     win.setMaximizable(true)
-    win.setMinimumSize(800, 600)
-    win.setSize(1060, 880, true)
+    win.setMinimumSize(960, 640)
+    win.setSize(1280, 820, true)
     win.center()
   }
 })

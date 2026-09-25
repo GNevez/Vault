@@ -9,6 +9,7 @@ import {
   ChevronsRight,
   Link2,
   Book,
+  House,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -21,6 +22,7 @@ interface SidebarProps {
 }
 
 const navItems = [
+  { id: "social", label: "Community", icon: House },
   { id: "catalog", label: "Catalog", icon: LayoutGrid },
   { id: "library", label: "Library", icon: Book },
   { id: "fonte", label: "Sources", icon: Link2 },

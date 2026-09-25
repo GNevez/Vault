@@ -9,7 +9,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       className="relative h-screen w-screen flex flex-col overflow-hidden rounded-[12px] border border-border-thin bg-background-dark"
       style={{ WebkitAppRegion: "drag" } as any}
     >
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <Component {...pageProps} />
       </div>
       <Toaster

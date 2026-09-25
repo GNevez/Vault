@@ -1,6 +1,6 @@
-appId: com.example.nextron
-productName: My Nextron App
-copyright: Copyright © 2018 Yoshihide Shiono
+appId: com.vault.launcher
+productName: Vault
+copyright: Copyright 2026 Vault
 directories:
   output: dist
   buildResources: resources
@@ -10,3 +10,5 @@ files:
       - package.json
       - app
 publish: null
+win:
+  signAndEditExecutable: false
