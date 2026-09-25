@@ -1,39 +1,43 @@
 import React, { useState } from "react";
-import {
-  Book,
-  Trash2,
-  Loader2,
-  Gamepad2,
-  Clock,
-  HardDrive,
-  Play,
-  Download,
-  X,
-  Link2,
-  Check,
-} from "lucide-react";
-import { useLibrary } from "../../hooks/useApi";
+import { ArrowRight, Book, Download, Link2, Loader2, SearchX, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import type { LibraryApi, LibraryGame } from "../../hooks/useApi";
+import { EmptyState, GameArt, accentButton, formatDate, ghostButton, iconButton, type GamesTab } from "./gameUi";
 
-export function Library() {
-  const { games, loading, remove, startDownload } = useLibrary();
+interface Props {
+  query: string;
+  library: LibraryApi;
+  onTab: (tab: GamesTab) => void;
+  onDownloadStarted: () => void;
+}
+
+const extractMagnetName = (uri: string) => {
+  try {
+    const match = uri.match(/dn=([^&]+)/);
+    if (match) return decodeURIComponent(match[1].replace(/\+/g, " "));
+  } catch {}
+  return uri.substring(0, 60) + "...";
+};
+
+export function Library({ query, library, onTab, onDownloadStarted }: Props) {
+  const { games, loading, remove, startDownload } = library;
   const [removing, setRemoving] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
-  const [uriPickerGame, setUriPickerGame] = useState<(typeof games)[0] | null>(null);
+  const [uriPickerGame, setUriPickerGame] = useState<LibraryGame | null>(null);
 
-  const handleRemove = async (item: (typeof games)[0]) => {
+  const handleRemove = async (item: LibraryGame) => {
     setRemoving(item.id);
     try {
       await remove(item.id);
-      toast.success(`${item.title} removed from library`);
+      toast.success(`${item.title} foi removido da biblioteca`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to remove from library");
+      toast.error(err.message || "Não foi possível remover da biblioteca");
     } finally {
       setRemoving(null);
     }
   };
 
-  const handleDownload = async (game: (typeof games)[0], magnetUri?: string) => {
+  const handleDownload = async (game: LibraryGame, magnetUri?: string) => {
     if (!magnetUri) {
       if (game.uris.length > 1) {
         setUriPickerGame(game);
@@ -47,173 +51,92 @@ export function Library() {
     setDownloading(game.id);
     try {
       await startDownload(magnetUri, game.title);
-      toast.success(`Download started: ${game.title}`);
+      onDownloadStarted();
+      toast.success(`Download iniciado: ${game.title}`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to start download");
+      toast.error(err.message || "Não foi possível iniciar o download");
     } finally {
       setDownloading(null);
     }
   };
 
-  const extractMagnetName = (uri: string) => {
-    try {
-      const dnMatch = uri.match(/dn=([^&]+)/);
-      if (dnMatch) return decodeURIComponent(dnMatch[1].replace(/\+/g, " "));
-    } catch {}
-    return uri.substring(0, 60) + "...";
-  };
+  const term = query.trim().toLocaleLowerCase();
+  const visible = term ? games.filter(g => g.title.toLocaleLowerCase().includes(term)) : games;
 
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString();
-    } catch {
-      return dateStr;
-    }
-  };
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-zinc-500" /></div>;
+
+  if (!games.length) {
+    return (
+      <EmptyState
+        icon={Book}
+        title="Sua biblioteca está vazia"
+        description="Adicione jogos pelo catálogo para baixá-los e mantê-los sempre à mão."
+        action={<button onClick={() => onTab("catalog")} className={accentButton}>Explorar catálogo<ArrowRight size={15} /></button>}
+      />
+    );
+  }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-4 px-6 h-16 border-b border-border-dark shrink-0">
-        <div className="min-w-0">
-          <h1 className="text-sm font-bold text-zinc-50 tracking-tight">
-            Library
-          </h1>
-          <p className="text-[10px] text-zinc-500">
-            {games.length} game{games.length !== 1 ? "s" : ""} in your library
-          </p>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
-          </div>
-        ) : games.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Book
-              className="w-8 h-8 text-zinc-700 mb-3"
-              strokeWidth={1.5}
-            />
-            <p className="text-sm text-zinc-500 mb-1">Your library is empty</p>
-            <p className="text-xs text-zinc-600">
-              Add games from the Catalog to see them here
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {games.map((game) => (
-              <div
-                key={game.id}
-                className="group flex items-center gap-5 p-3 rounded-xl border border-transparent hover:border-border-dark hover:bg-surface-dark/50 transition-all duration-200 cursor-pointer"
-              >
-                <div className="relative w-30 h-17 rounded-lg overflow-hidden shrink-0 bg-zinc-900 flex items-center justify-center">
-                  <Gamepad2
-                    className="w-6 h-6 text-zinc-700"
-                    strokeWidth={1.5}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center">
-                    <Play
-                      className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg"
-                      fill="white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-zinc-100 truncate">
-                    {game.title}
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">
-                    {game.sourceName}
-                  </p>
-                </div>
-
-                <div className="hidden sm:flex items-center gap-5 text-[11px] text-zinc-500">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatDate(game.uploadDate)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <HardDrive className="w-3 h-3" />
-                    <span>{game.fileSize}</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleDownload(game)}
-                  disabled={downloading === game.id}
-                  title="Download"
-                  className="p-2 rounded-lg text-zinc-600 hover:text-emerald-400 hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-                >
-                  {downloading === game.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" strokeWidth={1.8} />
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleRemove(game)}
-                  disabled={removing === game.id}
-                  title="Remove from library"
-                  className="p-2 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-                >
-                  {removing === game.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" strokeWidth={1.8} />
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+    <>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold tracking-tight text-zinc-50">Seus jogos</h2>
+        <span className="text-xs text-zinc-500">{games.length} {games.length === 1 ? "jogo" : "jogos"}</span>
       </div>
 
-      {/* URI Picker Modal */}
-      {uriPickerGame && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-lg mx-4 shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+      {!visible.length ? (
+        <EmptyState icon={SearchX} title="Nenhum jogo corresponde à busca" description="Tente outro termo." />
+      ) : (
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-raised">
+          {visible.map(game => (
+            <li key={game.id} className="flex items-center gap-4 p-3 transition hover:bg-raised-hover">
+              <GameArt title={game.title} size="sm" className="h-14 w-24 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-bold text-zinc-100 truncate">
-                  Choose a magnet link
-                </h2>
-                <p className="text-[11px] text-zinc-500 truncate mt-0.5">
-                  {uriPickerGame.title}
-                </p>
+                <h3 className="truncate text-sm font-semibold text-zinc-100" title={game.title}>{game.title}</h3>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">{game.sourceName}</p>
               </div>
-              <button
-                onClick={() => setUriPickerGame(null)}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 ml-3"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <dl className="hidden shrink-0 gap-6 text-right text-xs md:flex">
+                <div><dt className="text-zinc-600">Tamanho</dt><dd className="mt-0.5 text-zinc-300">{game.fileSize || "—"}</dd></div>
+                <div><dt className="text-zinc-600">Adicionado em</dt><dd className="mt-0.5 text-zinc-300">{formatDate(game.addedAt)}</dd></div>
+              </dl>
+              <div className="flex shrink-0 items-center gap-2">
+                <button onClick={() => void handleDownload(game)} disabled={downloading === game.id || !game.uris.length} className={`${ghostButton} px-3 py-1.5`}>
+                  {downloading === game.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  Baixar
+                </button>
+                <button onClick={() => void handleRemove(game)} disabled={removing === game.id} aria-label={`Remover ${game.title} da biblioteca`} title="Remover da biblioteca" className={`${iconButton} hover:text-red-400`}>
+                  {removing === game.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {uriPickerGame && (
+        <div className="fixed inset-x-0 bottom-0 top-13 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) setUriPickerGame(null); }}>
+          <div role="dialog" aria-modal="true" aria-label="Escolha um link" className="mx-4 w-full max-w-lg rounded-lg border border-line bg-panel shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-sm font-bold text-zinc-100">Escolha um link de download</h2>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">{uriPickerGame.title}</p>
+              </div>
+              <button onClick={() => setUriPickerGame(null)} aria-label="Fechar" className="ml-3 rounded-md p-1.5 text-zinc-500 hover:bg-raised hover:text-zinc-200"><X size={16} /></button>
             </div>
-            <div className="px-5 py-4 max-h-72 overflow-y-auto flex flex-col gap-2">
+            <div className="vault-scroll flex max-h-72 flex-col gap-2 overflow-y-auto px-5 py-4">
               {uriPickerGame.uris.map((uri, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleDownload(uriPickerGame, uri)}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/50 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 transition-all cursor-pointer text-left"
-                >
-                  <Link2 className="w-4 h-4 text-zinc-500 shrink-0" strokeWidth={1.8} />
+                <button key={idx} onClick={() => void handleDownload(uriPickerGame, uri)} className="flex items-center gap-3 rounded-md border border-line bg-raised p-3 text-left transition hover:border-zinc-600">
+                  <Link2 size={16} className="shrink-0 text-zinc-500" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-zinc-200 truncate">
-                      Magnet {idx + 1}
-                    </p>
-                    <p className="text-[10px] text-zinc-500 truncate mt-0.5">
-                      {extractMagnetName(uri)}
-                    </p>
+                    <p className="truncate text-xs font-medium text-zinc-200">Link {idx + 1}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-zinc-500">{extractMagnetName(uri)}</p>
                   </div>
-                  <Download className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                  <Download size={14} className="shrink-0 text-zinc-500" />
                 </button>
               ))}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

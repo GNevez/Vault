@@ -29,7 +29,7 @@ export function useSocial(tab: FeedTab) {
       setHasMore(result.hasMore);
     } catch (error: any) {
       if (!append) setPosts([]);
-      toast.error(error.message || 'Could not load the community feed');
+      toast.error(error.message || 'Não foi possível carregar o feed');
     } finally {
       setLoading(false);
     }

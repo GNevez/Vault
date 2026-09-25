@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowUpLeft, Heart, Repeat2, MessageCircle, Share2, Loader2 } from 'lucide-react';
+import { ArrowUpLeft, Heart, Link2, Loader2, MessageCircle, MessagesSquare, Repeat2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { authFetch, apiAssetUrl } from '../../lib/api';
 import { SocialPost } from '../../types/social';
+import { usePostList } from '../../hooks/usePostList';
+import { EmptyState } from '../ui/EmptyState';
+import { ghostButton } from '../ui/styles';
 import { Avatar } from './Avatar';
 import { PostComposer } from './PostComposer';
 import { SocialPageHeader } from './SocialPageHeader';
 import { InteractivePost } from './InteractivePost';
-import { usePostList } from '../../hooks/usePostList';
+import { PostAction, PostText, copyPostLink, parseApiDate } from './PostCard';
 
 export function PostDetail({ id, username }: { id: number; username: string }) {
   const router = useRouter();
@@ -30,33 +33,51 @@ export function PostDetail({ id, username }: { id: number; username: string }) {
       setPost(p => p && ({ ...p, ...(type === 'like' ? { isLiked: result.active, likeCount: result.count } : { isReposted: result.active, repostCount: result.count }) }));
     } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
   };
-  return <section className="flex h-full min-h-0 min-w-0 max-w-[860px] flex-1 flex-col border-r border-zinc-800">
-    <SocialPageHeader title="Post" subtitle="A conversation in Vault" />
+  const mediaUrl = apiAssetUrl(post?.mediaUrl);
+
+  return <section className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
     <div className="vault-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      {error ? <div role="alert" className="p-10 text-center text-zinc-400">{error}<button className="block mx-auto mt-4 underline" onClick={() => setRetry(n => n + 1)}>Try again</button></div> : !post ? <Loader2 className="animate-spin m-10 mx-auto" /> : <>
-        <article className="px-6 pt-5">
-          {post.replyToPostId && <button className="mb-4 flex items-center gap-2 text-xs text-zinc-400 hover:text-white" onClick={() => router.push({ pathname: '/dashboard', query: { post: post.replyToPostId } }, undefined, { shallow: true })}><ArrowUpLeft size={14} /> View parent post</button>}
-          <button onClick={profile} className="flex gap-3 items-center text-left hover:opacity-80"><Avatar username={post.username} src={post.avatarUrl} size="lg" /><div><p className="font-bold">{post.username}</p><p className="text-sm text-zinc-500">@{post.username}</p></div></button>
-          <p className="whitespace-pre-wrap break-words text-xl leading-8 mt-5">{post.content}</p>
-          {post.mediaUrl && <img src={apiAssetUrl(post.mediaUrl)!} alt="Post attachment" className="mt-4 rounded-2xl border border-zinc-800 w-full max-h-[580px] object-contain bg-black" />}
-          <time className="block text-xs text-zinc-500 py-5">{new Date(post.createdAt.endsWith('Z') ? post.createdAt : `${post.createdAt}Z`).toLocaleString()}</time>
-          <div className="flex flex-wrap gap-6 border-y border-zinc-800 py-4 text-sm text-zinc-500"><span><b className="text-white">{post.replyCount}</b> replies</span><span><b className="text-white">{post.repostCount}</b> reposts</span><span><b className="text-white">{post.likeCount}</b> likes</span></div>
-          <div className="flex justify-around py-3 border-b border-zinc-800">
-            <button title="Reply" onClick={() => document.getElementById('detail-reply')?.querySelector('textarea')?.focus()} className="p-2 hover:text-sky-400"><MessageCircle size={20} /></button>
-            <button title="Repost" disabled={busy} onClick={() => react('repost')} className={`p-2 ${post.isReposted ? 'text-emerald-400' : 'text-zinc-500'}`}><Repeat2 size={20} /></button>
-            <button title="Like" disabled={busy} onClick={() => react('like')} className={`p-2 ${post.isLiked ? 'text-rose-400' : 'text-zinc-500'}`}><Heart size={20} fill={post.isLiked ? 'currentColor' : 'none'} /></button>
-            <button title="Copy post link" className="p-2 text-zinc-500" onClick={() => navigator.clipboard.writeText(`${location.href.split('?')[0]}?post=${id}`).then(() => toast.success('Post link copied')).catch(() => toast.error('Could not copy link'))}><Share2 size={20} /></button>
-          </div>
-        </article>
-        <div id="detail-reply"><PostComposer username={username} replyTo={post.username} onSubmit={async (content, image) => {
-          const body = new FormData(); body.append('content', content); body.append('replyToPostId', String(id)); if (image) body.append('image', image);
-          await authFetch('/api/Social/posts', { method: 'POST', body });
-          setPost(p => p && ({ ...p, replyCount: p.replyCount + 1 })); await replies.load(true);
-        }} /></div>
-        {replies.items.map(reply => <InteractivePost key={reply.id} post={reply} username={username} update={updated => replies.setItems(items => items.map(p => p.id === updated.id ? updated : p))} />)}
-        {replies.error && <p role="alert" className="p-6 text-red-300">{replies.error}<button className="ml-3 underline" onClick={() => replies.load(true)}>Retry</button></p>}
-        {replies.loading ? <Loader2 className="animate-spin m-6 mx-auto" /> : !replies.items.length && !replies.error ? <p className="text-center text-zinc-500 py-10">Be the first to join this conversation.</p> : replies.hasMore && <button className="w-full p-4 text-sm hover:bg-zinc-900" onClick={() => replies.load()}>More replies</button>}
-      </>}
+      <div className="mx-auto w-full max-w-3xl px-8 pb-10 pt-7">
+        <SocialPageHeader title="Post" subtitle="Uma conversa no VAULT" />
+        {error ? <div role="alert" className="rounded-lg border border-red-900/40 bg-red-500/5 p-6 text-center text-sm text-red-400">{error}<button className="mx-auto mt-3 block underline" onClick={() => setRetry(n => n + 1)}>Tentar novamente</button></div> : !post ? <Loader2 aria-label="Carregando post" className="mx-auto my-12 animate-spin text-zinc-500" /> : <>
+          <article className="rounded-lg border border-line bg-raised">
+            <div className="p-6">
+              {post.replyToPostId && <button className="mb-4 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-200" onClick={() => router.push({ pathname: '/dashboard', query: { post: post.replyToPostId } }, undefined, { shallow: true })}><ArrowUpLeft size={14} />Ver post original{post.replyToUsername && ` de @${post.replyToUsername}`}</button>}
+              <button onClick={profile} className="flex items-center gap-3 text-left hover:opacity-80"><Avatar username={post.username} src={post.avatarUrl} size="lg" /><div><p className="text-sm font-semibold text-zinc-100">{post.username}</p><p className="text-xs text-zinc-500">@{post.username.toLowerCase()}</p></div></button>
+              {post.content && <div className="mt-5"><PostText content={post.content} large /></div>}
+              {mediaUrl && <img src={mediaUrl} alt="Imagem do post" className="mt-4 max-h-[580px] w-full rounded-md border border-line bg-panel object-contain" />}
+              <time className="mt-5 block text-xs text-zinc-500" dateTime={parseApiDate(post.createdAt).toISOString()}>{parseApiDate(post.createdAt).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}</time>
+            </div>
+            <div className="flex flex-wrap gap-6 border-t border-line px-6 py-3 text-sm text-zinc-500">
+              <span><b className="font-semibold text-zinc-100">{post.replyCount}</b> {post.replyCount === 1 ? 'resposta' : 'respostas'}</span>
+              <span><b className="font-semibold text-zinc-100">{post.repostCount}</b> reposts</span>
+              <span><b className="font-semibold text-zinc-100">{post.likeCount}</b> curtidas</span>
+            </div>
+            <div className="flex items-center gap-1 border-t border-line px-4 py-2">
+              <PostAction icon={MessageCircle} label="Responder" onClick={() => document.getElementById('detail-reply')?.querySelector('textarea')?.focus()} />
+              <PostAction icon={Repeat2} label={post.isReposted ? 'Desfazer repost' : 'Repostar'} active={post.isReposted} disabled={busy} onClick={() => void react('repost')} />
+              <PostAction icon={Heart} label={post.isLiked ? 'Descurtir' : 'Curtir'} active={post.isLiked} activeClass="text-rose-400" filled disabled={busy} onClick={() => void react('like')} />
+              <div className="flex-1" />
+              <PostAction icon={Link2} label="Copiar link" onClick={() => void copyPostLink(id)} />
+            </div>
+          </article>
+
+          <section id="detail-reply" aria-label="Responder" className="mt-4 rounded-lg border border-line bg-raised">
+            <PostComposer username={username} replyTo={post.username} onSubmit={async (content, image) => {
+              const body = new FormData(); body.append('content', content); body.append('replyToPostId', String(id)); if (image) body.append('image', image);
+              await authFetch('/api/Social/posts', { method: 'POST', body });
+              setPost(p => p && ({ ...p, replyCount: p.replyCount + 1 })); await replies.load(true);
+            }} />
+          </section>
+
+          <h2 className="mb-3 mt-8 text-lg font-bold tracking-tight text-zinc-50">Respostas</h2>
+          {replies.error && <p role="alert" className="mb-3 text-sm text-red-400">{replies.error}<button className="ml-3 underline" onClick={() => replies.load(true)}>Tentar novamente</button></p>}
+          {replies.items.length > 0 && <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-raised">
+            {replies.items.map(reply => <InteractivePost key={reply.id} post={reply} username={username} update={updated => replies.setItems(items => items.map(p => p.id === updated.id ? updated : p))} />)}
+          </div>}
+          {replies.loading ? <Loader2 aria-label="Carregando respostas" className="mx-auto my-6 animate-spin text-zinc-500" /> : !replies.items.length && !replies.error ? <EmptyState icon={MessagesSquare} title="Nenhuma resposta ainda" description="Seja o primeiro a entrar nesta conversa." /> : replies.hasMore && <div className="mt-4 flex justify-center"><button className={ghostButton} onClick={() => replies.load()}>Mais respostas</button></div>}
+        </>}
+      </div>
     </div>
   </section>;
 }

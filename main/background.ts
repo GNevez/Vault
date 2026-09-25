@@ -32,10 +32,27 @@ if (isProd) {
     center: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      backgroundThrottling: false,
     },
   })
 
   mainWindow.center()
+
+  const trustedPage = (value: string) => {
+    try {
+      const url = new URL(value)
+      return isProd ? url.protocol === 'app:' && url.hostname === '.' : url.origin === `http://localhost:${process.argv[2]}`
+    } catch { return false }
+  }
+  mainWindow.webContents.session.setPermissionCheckHandler((contents, permission, _origin, details) => {
+    if (contents !== mainWindow.webContents || !details.isMainFrame || !trustedPage(details.requestingUrl || contents.getURL())) return false
+    return permission === 'media' ? details.mediaType === 'audio' : permission === 'clipboard-sanitized-write' || permission === 'fullscreen'
+  })
+  mainWindow.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const trusted = contents === mainWindow.webContents && details.isMainFrame && trustedPage(details.requestingUrl)
+    const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined
+    callback(!!trusted && (permission === 'media' ? !!mediaTypes?.length && mediaTypes.every(type => type === 'audio') : permission === 'clipboard-sanitized-write' || permission === 'fullscreen'))
+  })
 
   log('Window created')
 

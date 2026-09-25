@@ -1,208 +1,83 @@
 import React from "react";
-import {
-  Download,
-  Pause,
-  Play,
-  Trash2,
-  Loader2,
-  HardDrive,
-  ArrowDown,
-  ArrowUp,
-  Users,
-} from "lucide-react";
-import { useDownloads } from "../../hooks/useApi";
+import { ArrowDown, ArrowRight, ArrowUp, Download, Loader2, Pause, Play, SearchX, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import type { DownloadsApi } from "../../hooks/useApi";
+import { EmptyState, GameArt, formatBytes, formatSpeed, ghostButton, iconButton, downloadState, isPausedDownload, isRunningDownload, type GamesTab } from "./gameUi";
 
-export function Downloads() {
-  const { downloads, loading, pause, resume, cancel } = useDownloads(2000);
+export function Downloads({ query, downloads: api, onTab }: { query: string; downloads: DownloadsApi; onTab: (tab: GamesTab) => void }) {
+  const { downloads, loading, pause, resume, cancel } = api;
 
-  const handlePause = async (id: string) => {
+  const run = async (action: () => Promise<void>, failure: string, success?: string) => {
     try {
-      await pause(id);
+      await action();
+      if (success) toast.success(success);
     } catch (err: any) {
-      toast.error(err.message || "Failed to pause");
+      toast.error(err.message || failure);
     }
   };
 
-  const handleResume = async (id: string) => {
-    try {
-      await resume(id);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to resume");
-    }
-  };
+  const term = query.trim().toLocaleLowerCase();
+  const visible = term ? downloads.filter(d => d.title.toLocaleLowerCase().includes(term)) : downloads;
 
-  const handleCancel = async (id: string) => {
-    try {
-      await cancel(id);
-      toast.success("Download cancelled");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to cancel");
-    }
-  };
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-zinc-500" /></div>;
 
-  const formatSpeed = (bytesPerSec: number) => {
-    if (bytesPerSec < 1024) return `${bytesPerSec} B/s`;
-    if (bytesPerSec < 1024 * 1024)
-      return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
-    return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes <= 0) return "—";
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024)
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
-
-  const getStateLabel = (state: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      Downloading: { label: "Downloading", color: "text-emerald-400" },
-      Seeding: { label: "Seeding", color: "text-blue-400" },
-      Paused: { label: "Paused", color: "text-yellow-400" },
-      Stopped: { label: "Stopped", color: "text-zinc-500" },
-      Hashing: { label: "Checking", color: "text-orange-400" },
-      Metadata: { label: "Getting metadata", color: "text-purple-400" },
-      Starting: { label: "Starting", color: "text-zinc-400" },
-      Error: { label: "Error", color: "text-red-400" },
-    };
-    return map[state] || { label: state, color: "text-zinc-500" };
-  };
-
-  const isPaused = (state: string) => state === "Paused" || state === "Stopped";
-  const isActive = (state: string) =>
-    state === "Downloading" || state === "Seeding" || state === "Metadata" || state === "Hashing";
+  if (!downloads.length) {
+    return (
+      <EmptyState
+        icon={Download}
+        title="Nenhum download no momento"
+        description="Os jogos que você baixar pela biblioteca aparecem aqui com o progresso em tempo real."
+        action={<button onClick={() => onTab("library")} className={ghostButton}>Ir para a biblioteca<ArrowRight size={15} /></button>}
+      />
+    );
+  }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      <header className="flex items-center gap-4 px-6 h-16 border-b border-border-dark shrink-0">
-        <div className="min-w-0">
-          <h1 className="text-sm font-bold text-zinc-50 tracking-tight">
-            Downloads
-          </h1>
-          <p className="text-[10px] text-zinc-500">
-            {downloads.length} download{downloads.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </header>
+    <>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold tracking-tight text-zinc-50">Fila de downloads</h2>
+        <span className="text-xs text-zinc-500">{downloads.length} {downloads.length === 1 ? "item" : "itens"}</span>
+      </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
-          </div>
-        ) : downloads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Download
-              className="w-8 h-8 text-zinc-700 mb-3"
-              strokeWidth={1.5}
-            />
-            <p className="text-sm text-zinc-500 mb-1">No active downloads</p>
-            <p className="text-xs text-zinc-600">
-              Start a download from your Library
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {downloads.map((dl) => {
-              const stateInfo = getStateLabel(dl.state);
-              return (
-                <div
-                  key={dl.id}
-                  className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 transition-colors"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                      <Download
-                        className="w-4 h-4 text-zinc-400"
-                        strokeWidth={1.8}
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-zinc-100 truncate">
-                        {dl.title}
-                      </h3>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span
-                          className={`text-[11px] font-medium ${stateInfo.color}`}
-                        >
-                          {stateInfo.label}
-                        </span>
-                        <span className="text-[11px] text-zinc-500">
-                          {dl.progress.toFixed(1)}%
-                        </span>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="mt-2 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                          style={{ width: `${Math.min(dl.progress, 100)}%` }}
-                        />
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-500">
-                        <div className="flex items-center gap-1">
-                          <ArrowDown className="w-3 h-3" />
-                          <span>{formatSpeed(dl.downloadSpeed)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <ArrowUp className="w-3 h-3" />
-                          <span>{formatSpeed(dl.uploadSpeed)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <HardDrive className="w-3 h-3" />
-                          <span>
-                            {formatSize(dl.downloadedBytes)} /{" "}
-                            {formatSize(dl.totalSize)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          <span>
-                            {dl.seeds}S / {dl.peers}P
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isPaused(dl.state) ? (
-                        <button
-                          onClick={() => handleResume(dl.id)}
-                          title="Resume"
-                          className="p-2 rounded-lg text-zinc-600 hover:text-emerald-400 hover:bg-zinc-800 transition-colors cursor-pointer"
-                        >
-                          <Play className="w-4 h-4" strokeWidth={1.8} />
-                        </button>
-                      ) : isActive(dl.state) ? (
-                        <button
-                          onClick={() => handlePause(dl.id)}
-                          title="Pause"
-                          className="p-2 rounded-lg text-zinc-600 hover:text-yellow-400 hover:bg-zinc-800 transition-colors cursor-pointer"
-                        >
-                          <Pause className="w-4 h-4" strokeWidth={1.8} />
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={() => handleCancel(dl.id)}
-                        title="Cancel"
-                        className="p-2 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" strokeWidth={1.8} />
-                      </button>
-                    </div>
+      {!visible.length ? (
+        <EmptyState icon={SearchX} title="Nenhum download corresponde à busca" description="Tente outro termo." />
+      ) : (
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-raised">
+          {visible.map(dl => {
+            const state = downloadState(dl.state);
+            const progress = Math.min(Math.max(dl.progress, 0), 100);
+            return (
+              <li key={dl.id} className="flex items-center gap-4 p-4">
+                <GameArt title={dl.title} size="sm" className="hidden h-14 w-24 shrink-0 rounded-md sm:block" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-3">
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-100" title={dl.title}>{dl.title}</h3>
+                    <span className={`shrink-0 text-xs font-medium ${state.tone}`}>{state.label}</span>
+                    <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-400">{progress.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span>
+                  </div>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} aria-label={`Progresso de ${dl.title}`}>
+                    <div className={`h-full rounded-full transition-all duration-500 ${dl.state === "Error" ? "bg-red-400" : isPausedDownload(dl.state) ? "bg-zinc-500" : "bg-accent"}`} style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-zinc-500">
+                    <span>{formatBytes(dl.downloadedBytes)} de {formatBytes(dl.totalSize)}</span>
+                    <span className="flex items-center gap-1"><ArrowDown size={12} />{formatSpeed(dl.downloadSpeed)}</span>
+                    <span className="flex items-center gap-1"><ArrowUp size={12} />{formatSpeed(dl.uploadSpeed)}</span>
+                    <span className="flex items-center gap-1"><Users size={12} />{dl.seeds} seeds · {dl.peers} peers</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isPausedDownload(dl.state) ? (
+                    <button onClick={() => void run(() => resume(dl.id), "Não foi possível retomar")} aria-label={`Retomar ${dl.title}`} title="Retomar" className={iconButton}><Play size={15} /></button>
+                  ) : isRunningDownload(dl.state) ? (
+                    <button onClick={() => void run(() => pause(dl.id), "Não foi possível pausar")} aria-label={`Pausar ${dl.title}`} title="Pausar" className={iconButton}><Pause size={15} /></button>
+                  ) : null}
+                  <button onClick={() => void run(() => cancel(dl.id), "Não foi possível cancelar", "Download cancelado")} aria-label={`Cancelar ${dl.title}`} title="Cancelar" className={`${iconButton} hover:text-red-400`}><Trash2 size={15} /></button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }

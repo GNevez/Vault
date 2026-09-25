@@ -1,21 +1,26 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Gamepad2, Sparkles, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Gamepad2, Search, SearchX, X } from 'lucide-react';
 import { useRouter } from 'next/router';
 import type { SocialPost } from '../../types/social';
 import { useSocial, type FeedTab } from '../../hooks/useSocial';
-import { NotificationsPanel } from './NotificationsPanel';
+import { EmptyState } from '../ui/EmptyState';
+import { ghostButton, tabClass } from '../ui/styles';
+import { NotificationsButton } from './NotificationsPanel';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
 import { TrendsPanel } from './TrendsPanel';
+
+const TABS: { id: FeedTab; label: string }[] = [
+  { id: 'for-you', label: 'Para você' },
+  { id: 'following', label: 'Seguindo' },
+];
 
 export function SocialFeed({ username }: { username: string }) {
   const router = useRouter();
   const [tab, setTab] = useState<FeedTab>('for-you');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<SocialPost | null>(null);
-  const notificationArea = useRef<HTMLDivElement>(null);
   const social = useSocial(tab);
 
   useEffect(() => setPage(1), [tab]);
@@ -25,14 +30,11 @@ export function SocialFeed({ username }: { username: string }) {
   }, [router.query.search]);
 
   useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (!notificationArea.current?.contains(event.target as Node)) {
-        setNotificationsOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, []);
+    if (!replyingTo) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setReplyingTo(null); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [replyingTo]);
 
   const visiblePosts = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -44,124 +46,123 @@ export function SocialFeed({ username }: { username: string }) {
     );
   }, [search, social.posts]);
 
-  const openNotifications = async () => {
-    const next = !notificationsOpen;
-    setNotificationsOpen(next);
-    if (next) await social.markNotificationsRead();
-  };
-
   return (
-    <div className="relative flex h-full min-w-0 flex-1 overflow-hidden bg-background-dark">
-      <main className="flex min-w-0 flex-1 flex-col border-r border-border-dark">
-        <header className="relative z-30 flex h-16 shrink-0 items-stretch border-b border-border-dark bg-background-dark/95">
-          <div className="flex min-w-0 flex-1 items-stretch">
-            <button
-              onClick={() => setTab('for-you')}
-              className={`relative flex-1 text-xs font-semibold transition hover:bg-white/[0.025] ${tab === 'for-you' ? 'text-zinc-100' : 'text-zinc-600'}`}
-            >
-              For you
-              {tab === 'for-you' && <span className="absolute bottom-0 left-1/2 h-0.5 w-12 -translate-x-1/2 rounded-full bg-zinc-100" />}
-            </button>
-            <button
-              onClick={() => setTab('following')}
-              className={`relative flex-1 text-xs font-semibold transition hover:bg-white/[0.025] ${tab === 'following' ? 'text-zinc-100' : 'text-zinc-600'}`}
-            >
-              Following
-              {tab === 'following' && <span className="absolute bottom-0 left-1/2 h-0.5 w-12 -translate-x-1/2 rounded-full bg-zinc-100" />}
-            </button>
-          </div>
-
-          <div ref={notificationArea} className="relative flex w-16 items-center justify-center border-l border-zinc-900">
-            <button
-              onClick={openNotifications}
-              aria-label="Notifications"
-              aria-expanded={notificationsOpen}
-              className={`relative grid h-9 w-9 place-items-center rounded-full transition ${notificationsOpen ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-100'}`}
-              title="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-              {social.unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[9px] font-bold leading-4 text-white ring-2 ring-background-dark">
-                  {social.unreadCount > 9 ? '9+' : social.unreadCount}
-                </span>
-              )}
-            </button>
-            {notificationsOpen && <NotificationsPanel notifications={social.notifications} />}
-          </div>
-        </header>
-
-        <div className="vault-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <PostComposer username={username} onSubmit={social.createPost} />
-
-          {social.loading ? (
-            <div className="space-y-px">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="flex gap-3 border-b border-border-dark px-5 py-5">
-                  <div className="h-10 w-10 animate-pulse rounded-full bg-zinc-900" />
-                  <div className="flex-1 space-y-3">
-                    <div className="h-3 w-36 animate-pulse rounded bg-zinc-900" />
-                    <div className="h-3 w-4/5 animate-pulse rounded bg-zinc-900" />
-                    <div className="h-3 w-2/5 animate-pulse rounded bg-zinc-900" />
-                  </div>
-                </div>
-              ))}
+    <div className="relative flex h-full min-w-0 flex-1 flex-col">
+      <div className="vault-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-[1160px] px-8 pb-10 pt-7">
+          <header className="relative z-30 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[28px] font-bold leading-tight tracking-tight text-zinc-50">Comunidade</h1>
+              <p className="mt-1 text-sm text-zinc-500">O que seus amigos estão jogando e compartilhando.</p>
             </div>
-          ) : visiblePosts.length ? (
-            <>
-              {visiblePosts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  onLike={() => social.toggleLike(post.id)}
-                  onRepost={() => social.toggleRepost(post.id)}
-                  onReply={() => setReplyingTo(post)}
-                  onFollow={() => social.toggleFollow(post.authorId)}
-                  currentUsername={username}
+            <div className="flex w-full max-w-80 items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === 'Escape') setSearch(''); }}
+                  placeholder="Buscar posts, jogadores ou #tags"
+                  aria-label="Buscar na comunidade"
+                  className="h-10 w-full rounded-md border border-line bg-raised pl-9 pr-9 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-accent/60 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
                 />
-              ))}
-              {social.hasMore && !search && (
-                <div className="flex justify-center py-5">
-                  <button
-                    onClick={() => {
-                      const nextPage = page + 1;
-                      setPage(nextPage);
-                      social.loadFeed(nextPage, true);
-                    }}
-                    className="rounded-full border border-zinc-800 px-4 py-2 text-[11px] font-semibold text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
-                  >
-                    Load more
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col items-center px-8 py-20 text-center">
-              <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-zinc-800 bg-zinc-900/60">
-                {search ? <Sparkles className="h-6 w-6 text-zinc-600" /> : <Gamepad2 className="h-6 w-6 text-zinc-500" />}
+                {search && <button onClick={() => setSearch('')} aria-label="Limpar busca" className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-zinc-500 hover:text-zinc-200"><X size={14} /></button>}
               </div>
-              <h2 className="text-sm font-bold text-zinc-200">
-                {search ? 'No posts match your search' : tab === 'following' ? 'Your following feed is quiet' : 'Your gaming feed starts here'}
-              </h2>
-              <p className="mt-1 max-w-xs text-[11px] leading-5 text-zinc-600">
-                {search ? 'Try a different player, game or hashtag.' : 'Share a screenshot, an opinion or the game you are playing right now.'}
-              </p>
+              <NotificationsButton notifications={social.notifications} unreadCount={social.unreadCount} onOpen={() => social.markNotificationsRead().catch(() => {})} />
             </div>
-          )}
-        </div>
-      </main>
+          </header>
 
-      <TrendsPanel trends={social.trends} search={search} onSearch={setSearch} />
+          <nav role="tablist" aria-label="Feed" className="mb-6 mt-5 flex gap-1 border-b border-line">
+            {TABS.map(({ id, label }) => (
+              <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={tabClass(tab === id)}>
+                {label}
+                {tab === id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" />}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex gap-8">
+            <main className="min-w-0 flex-1 space-y-4">
+              <section aria-label="Criar post" className="rounded-lg border border-line bg-raised">
+                <PostComposer username={username} onSubmit={social.createPost} />
+              </section>
+
+              {search.trim() && (
+                <p className="flex items-center gap-2 text-xs text-zinc-500">
+                  {visiblePosts.length} {visiblePosts.length === 1 ? 'resultado' : 'resultados'} para <span className="font-medium text-zinc-200">“{search.trim()}”</span>
+                </p>
+              )}
+
+              {social.loading ? (
+                <div aria-busy className="divide-y divide-line rounded-lg border border-line bg-raised">
+                  {[0, 1, 2].map((item) => (
+                    <div key={item} className="flex gap-3 px-5 py-5">
+                      <div className="h-10 w-10 animate-pulse rounded-full bg-raised-hover" />
+                      <div className="flex-1 space-y-3">
+                        <div className="h-3 w-36 animate-pulse rounded bg-raised-hover" />
+                        <div className="h-3 w-4/5 animate-pulse rounded bg-raised-hover" />
+                        <div className="h-3 w-2/5 animate-pulse rounded bg-raised-hover" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : visiblePosts.length ? (
+                <>
+                  <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-raised">
+                    {visiblePosts.map((post) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        onLike={() => social.toggleLike(post.id)}
+                        onRepost={() => social.toggleRepost(post.id)}
+                        onReply={() => setReplyingTo(post)}
+                        onFollow={() => social.toggleFollow(post.authorId)}
+                        currentUsername={username}
+                      />
+                    ))}
+                  </div>
+                  {social.hasMore && !search && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        onClick={() => {
+                          const nextPage = page + 1;
+                          setPage(nextPage);
+                          void social.loadFeed(nextPage, true);
+                        }}
+                        className={ghostButton}
+                      >
+                        Carregar mais
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : search.trim() ? (
+                <EmptyState icon={SearchX} title="Nenhum post corresponde à busca" description="Tente outro jogador, jogo ou hashtag." action={<button onClick={() => setSearch('')} className={ghostButton}>Limpar busca</button>} />
+              ) : (
+                <EmptyState
+                  icon={Gamepad2}
+                  title={tab === 'following' ? 'Seu feed de quem você segue está quieto' : 'Seu feed começa aqui'}
+                  description={tab === 'following' ? 'Siga jogadores para ver os posts deles nesta aba.' : 'Compartilhe uma captura de tela, uma opinião ou o jogo que você está jogando agora.'}
+                  action={tab === 'following' ? <button onClick={() => setTab('for-you')} className={ghostButton}>Ver “Para você”</button> : undefined}
+                />
+              )}
+            </main>
+
+            <TrendsPanel trends={social.trends} active={search.trim()} onSelect={setSearch} />
+          </div>
+        </div>
+      </div>
 
       {replyingTo && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl">
-            <div className="flex items-center border-b border-zinc-800 px-4 py-3">
-              <div>
-                <p className="text-xs font-bold text-zinc-100">Reply to @{replyingTo.username}</p>
-                <p className="mt-0.5 max-w-md truncate text-[10px] text-zinc-600">{replyingTo.content}</p>
+        <div className="absolute inset-0 z-50 grid place-items-center bg-black/70 p-6 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setReplyingTo(null); }}>
+          <div role="dialog" aria-modal="true" aria-label={`Responder a ${replyingTo.username}`} className="w-full max-w-lg overflow-hidden rounded-lg border border-line bg-panel shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-zinc-100">Responder a @{replyingTo.username}</p>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">{replyingTo.content}</p>
               </div>
-              <div className="flex-1" />
-              <button onClick={() => setReplyingTo(null)} className="rounded-full p-2 text-zinc-600 transition hover:bg-zinc-800 hover:text-white">
+              <button onClick={() => setReplyingTo(null)} aria-label="Fechar" className="grid h-8 w-8 place-items-center rounded-md text-zinc-500 transition hover:bg-raised hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>

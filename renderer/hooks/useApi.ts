@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { authFetch } from "../lib/api";
 import { toast } from "sonner";
 
 // ─── Sources ────────────────────────────────────────────────
 
-interface Source {
+export interface Source {
   id: number;
   url: string;
   name: string;
@@ -20,7 +20,7 @@ export function useSources() {
       const data = await authFetch("/api/Source");
       setSources(data);
     } catch (err: any) {
-      toast.error(err.message || "Failed to load sources");
+      toast.error(err.message || "Não foi possível carregar as fontes");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export function useSources() {
 
 // ─── Catalog ────────────────────────────────────────────────
 
-interface Game {
+export interface Game {
   title: string;
   uris: string[];
   uploadDate: string;
@@ -70,18 +70,21 @@ interface PaginatedGames {
 export function useCatalog() {
   const [data, setData] = useState<PaginatedGames | null>(null);
   const [loading, setLoading] = useState(true);
+  const latestRequest = useRef(0);
 
-  const loadGames = useCallback(async (page: number, search: string) => {
+  const loadGames = useCallback(async (page: number, search: string, sourceId?: number) => {
+    const request = ++latestRequest.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: "15" });
       if (search.trim()) params.set("search", search.trim());
+      if (sourceId) params.set("sourceId", String(sourceId));
       const result = await authFetch(`/api/Source/games?${params}`);
-      setData(result);
+      if (request === latestRequest.current) setData(result);
     } catch {
-      setData({ items: [], page: 1, pageSize: 15, totalItems: 0, totalPages: 0 });
+      if (request === latestRequest.current) setData({ items: [], page: 1, pageSize: 15, totalItems: 0, totalPages: 0 });
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
   }, []);
 
@@ -97,7 +100,7 @@ export function useCatalog() {
 
 // ─── Library ────────────────────────────────────────────────
 
-interface LibraryGame {
+export interface LibraryGame {
   id: number;
   sourceId: number;
   gameIndex: number;
@@ -118,7 +121,7 @@ export function useLibrary() {
       const data = await authFetch("/api/Library");
       setGames(data);
     } catch (err: any) {
-      toast.error(err.message || "Failed to load library");
+      toast.error(err.message || "Não foi possível carregar a biblioteca");
     } finally {
       setLoading(false);
     }
@@ -145,7 +148,7 @@ export function useLibrary() {
 
 // ─── Downloads / Torrent ────────────────────────────────────
 
-interface DownloadItem {
+export interface DownloadItem {
   id: string;
   title: string;
   magnetUri: string;
@@ -196,3 +199,7 @@ export function useDownloads(pollInterval = 2000) {
 
   return { downloads, loading, pause, resume, cancel, reload: load };
 }
+
+export type SourcesApi = ReturnType<typeof useSources>;
+export type LibraryApi = ReturnType<typeof useLibrary>;
+export type DownloadsApi = ReturnType<typeof useDownloads>;

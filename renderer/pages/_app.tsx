@@ -16,9 +16,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         position="top-right"
         toastOptions={{
           style: {
-            background: "white",
-            color: "black",
-            border: "1px solid #e4e4e7",
+            background: "#1b1b1f",
+            color: "#f4f4f5",
+            border: "1px solid #26262b",
           },
         }}
       />

@@ -1,30 +1,63 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Sidebar } from '../components/layout/Sidebar';
-import { Catalog } from '../components/dashboard/Catalog';
-import { Fonte } from '../components/dashboard/Fonte';
-import { Library } from '../components/dashboard/Library';
-import { Downloads } from '../components/dashboard/Downloads';
+import { AppTopBar, type AppModule } from '../components/layout/AppTopBar';
+import { ServerSidebar } from '../components/layout/ServerSidebar';
+import { GamesWorkspace } from '../components/dashboard/GamesWorkspace';
+import type { GamesTab } from '../components/dashboard/gameUi';
 import { SocialFeed } from '../components/social/SocialFeed';
 import { PostDetail } from '../components/social/PostDetail';
 import { UserProfile } from '../components/social/UserProfile';
-import { TitleBar } from '../components/ui/TitleBar';
+import { VoiceProvider, useVoice } from '../components/servers/VoiceProvider';
+import { ServersWorkspace } from '../components/servers/ServersWorkspace';
+import { ServerManager } from '../components/servers/ServerDialog';
+import { useServerDetail, useServers } from '../hooks/useServers';
+
+const GAMES_TABS: GamesTab[] = ['catalog', 'library', 'downloads', 'fonte'];
+const SIDEBAR_KEY = 'vault.sidebarCollapsed';
+const TITLES: Record<AppModule, string> = { community: 'Comunidade', games: 'Games', servers: 'Servidores' };
 
 export default function DashboardPage() {
-  const [activeSection, setActiveSection] = useState('social');
-  const [previousSection, setPreviousSection] = useState<string | null>(null);
+  return <VoiceProvider><DashboardContent /></VoiceProvider>;
+}
+
+function DashboardContent() {
   const [username, setUsername] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [focusedServer, setFocusedServer] = useState<number>();
   const router = useRouter();
+  const { voice, engine } = useVoice();
+  const serverList = useServers();
+  const [serverManager, setServerManager] = useState<'create' | 'join' | null>(null);
+  const parsedServer = Number(router.query.server);
+  const serverId = Number.isSafeInteger(parsedServer) && parsedServer > 0 ? parsedServer : undefined;
+  const parsedText = Number(router.query.text);
+  const textChannelId = Number.isSafeInteger(parsedText) && parsedText > 0 ? parsedText : undefined;
+  const activeSection = router.query.profile || router.query.post ? 'social' : serverId ? 'servers' : typeof router.query.section === 'string' ? router.query.section : 'social';
+  const gamesTab = GAMES_TABS.find(tab => tab === activeSection);
+  const activeModule: AppModule | null = gamesTab ? 'games' : activeSection === 'servers' ? 'servers' : activeSection === 'settings' ? null : 'community';
+
+  // The side panel lists channels for the open server, else the last one picked, the active call's, or the first.
+  const known = (id?: number) => (id && serverList.servers.some(s => s.id === id) ? id : undefined);
+  const panelServerId = serverId ?? known(focusedServer) ?? known(voice.session?.serverId) ?? serverList.servers[0]?.id;
+  const panelServer = useServerDetail(panelServerId);
+  // Servidores always shows a server: the one in the URL or the one selected in the side panel.
+  const openServerId = activeModule === 'servers' ? serverId ?? panelServerId : undefined;
 
   useEffect(() => {
     const stored = localStorage.getItem('username');
     if (stored) setUsername(stored);
+    try { setSidebarCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1'); } catch {}
     window.ipc?.send('window-enter-dashboard', null);
   }, []);
 
-  const handleLogout = () => {
+  const toggleSidebar = () => setSidebarCollapsed(value => {
+    try { localStorage.setItem(SIDEBAR_KEY, value ? '0' : '1'); } catch {}
+    return !value;
+  });
+
+  const handleLogout = async () => {
+    await engine.disconnect();
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     window.ipc?.send('window-enter-login', null);
@@ -32,43 +65,44 @@ export default function DashboardPage() {
   };
 
   const handleNavigate = (section: string) => {
-    router.push(section === 'profile' ? '/dashboard?profile=me' : '/dashboard', undefined, { shallow: true });
-    setPreviousSection(activeSection);
-    setActiveSection(section === 'profile' ? 'social' : section);
+    router.push({ pathname: '/dashboard', query: section === 'profile' ? { profile: 'me' } : section === 'social' ? {} : { section } }, undefined, { shallow: true });
   };
 
-  const handleGoBack = () => {
-    if (!previousSection) return;
-    setActiveSection(previousSection);
-    setPreviousSection(null);
+  const selectServer = (id?: number, text?: number) => {
+    if (id) setFocusedServer(id);
+    return router.push({ pathname: '/dashboard', query: id ? { server: id, ...(text ? { text } : {}) } : { section: 'servers' } }, undefined, { shallow: true });
+  };
+
+  const handleServerRemoved = async () => {
+    setFocusedServer(undefined);
+    await serverList.refresh();
+    if (activeModule === 'servers') await selectServer();
+  };
+
+  const focusServer = (id: number) => {
+    setFocusedServer(id);
+    if (activeModule === 'servers') void selectServer(id);
   };
 
   const renderContent = () => {
     if (typeof router.query.post === 'string') {
       const id = Number(router.query.post);
-      return Number.isSafeInteger(id) && id > 0 ? <PostDetail key={`post-${id}`} id={id} username={username} /> : <p className="p-8">Invalid post.</p>;
+      return Number.isSafeInteger(id) && id > 0 ? <PostDetail key={`post-${id}`} id={id} username={username} /> : <p className="p-8 text-sm text-zinc-500">Post inválido.</p>;
     }
     if (typeof router.query.profile === 'string') {
       const target = router.query.profile;
-      return target === 'me' || /^[1-9]\d*$/.test(target) ? <UserProfile key={`profile-${target}`} target={target} username={username} /> : <p className="p-8">Invalid profile.</p>;
+      return target === 'me' || /^[1-9]\d*$/.test(target) ? <UserProfile key={`profile-${target}`} target={target} username={username} /> : <p className="p-8 text-sm text-zinc-500">Perfil inválido.</p>;
     }
+    if (gamesTab) return <GamesWorkspace tab={gamesTab} onTab={handleNavigate} />;
     switch (activeSection) {
-      case 'social':
-        return <SocialFeed username={username || 'Player'} />;
-      case 'catalog':
-        return <Catalog onGoBack={previousSection ? handleGoBack : undefined} />;
-      case 'library':
-        return <Library />;
-      case 'fonte':
-        return <Fonte />;
-      case 'downloads':
-        return <Downloads />;
+      case 'servers':
+        return <ServersWorkspace serverId={openServerId} textChannelId={textChannelId} username={username} hasServers={serverList.servers.length > 0} listLoading={serverList.loading} listError={serverList.error} refreshServers={serverList.refresh} server={openServerId ? panelServer.server : null} error={openServerId ? panelServer.error : ''} reload={panelServer.reload} onManage={setServerManager} />;
       case 'profile':
         return <UserProfile target="me" username={username} />;
       case 'settings':
         return (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-zinc-500">Settings — Coming soon</p>
+            <p className="text-sm text-zinc-500">Configurações — em breve</p>
           </div>
         );
       default:
@@ -76,31 +110,39 @@ export default function DashboardPage() {
     }
   };
 
-  const sectionTitle = router.query.post ? 'Post' : router.query.profile ? 'Profile' : activeSection.charAt(0).toUpperCase() + activeSection.slice(1);
+  const sectionTitle = router.query.post ? 'Post' : router.query.profile ? 'Perfil' : activeModule ? TITLES[activeModule] : 'Configurações';
 
   return (
     <>
       <Head>
-        <title>{`Vault - ${sectionTitle}`}</title>
+        <title>{`VAULT · ${sectionTitle}`}</title>
       </Head>
 
-      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-dark">
-        <TitleBar />
-        <div
-          className="flex min-h-0 w-full flex-1 text-white"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <Sidebar
-            activeSection={router.query.profile ? 'profile' : router.query.post ? 'social' : activeSection}
-            onNavigate={handleNavigate}
-            onLogout={handleLogout}
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background-dark text-white">
+        <AppTopBar active={activeModule} username={username} inVoice={!!voice.session} onNavigate={handleNavigate} onLogout={() => void handleLogout()} />
+        <div className="flex min-h-0 w-full flex-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <ServerSidebar
             username={username}
+            servers={serverList.servers}
+            loading={serverList.loading}
+            error={serverList.error}
+            focusedId={panelServerId}
+            detail={panelServer.server}
+            detailError={panelServer.error}
+            routeServerId={openServerId}
+            textChannelId={textChannelId}
             collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+            onToggleCollapse={toggleSidebar}
+            onFocus={focusServer}
+            onOpen={(id, channel) => void selectServer(id, channel)}
+            onManage={setServerManager}
+            onChanged={panelServer.reload}
+            onRemoved={handleServerRemoved}
           />
-          {renderContent()}
+          <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">{renderContent()}</main>
         </div>
       </div>
+      {serverManager && <ServerManager mode={serverManager} onClose={() => setServerManager(null)} onComplete={id => { setServerManager(null); void serverList.refresh(); void selectServer(id); }} />}
     </>
   );
 }
